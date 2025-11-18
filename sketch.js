@@ -8,7 +8,10 @@ function drawLevelQuestion() {
   
   fill(255);
   textSize(20);
-  text('Answer correctly to advance to Level ' + (level + 1), width/2, 140);
+  let prompt = level >= TOTAL_LEVELS
+    ? 'Answer correctly to complete the challenge!'
+    : 'Answer correctly to advance to Level ' + (level + 1);
+  text(prompt, width/2, 140);
   
   // Question - allow multi-line
   fill(255);
@@ -39,8 +42,255 @@ function drawLevelQuestion() {
     textAlign(CENTER, CENTER);
     text(String.fromCharCode(65 + i) + ') ' + questionOptions[i], width/2, y);
   }
-}// Game variables
-let gameState = 'menu'; // menu, practice, learning, gameover, question, levelquestion
+}
+
+function getExplanationPopupLayout() {
+  let panelW = 520;
+  let panelH = 280;
+  let panelX = width/2 - panelW/2;
+  let panelY = height/2 - panelH/2;
+  let buttonW = 180;
+  let buttonH = 50;
+  let buttonX = width/2 - buttonW/2;
+  let buttonY = panelY + panelH - 70;
+  return {
+    panel: { x: panelX, y: panelY, w: panelW, h: panelH },
+    button: { x: buttonX, y: buttonY, w: buttonW, h: buttonH }
+  };
+}
+
+function drawExplanationPopup() {
+  if (!explanationPopup) return;
+  let layout = getExplanationPopupLayout();
+  push();
+  fill(0, 0, 0, 180);
+  rect(0, 0, width, height);
+  pop();
+  
+  fill(255);
+  stroke(50, 90, 150);
+  strokeWeight(3);
+  rect(layout.panel.x, layout.panel.y, layout.panel.w, layout.panel.h, 14);
+  
+  noStroke();
+  fill(40, 80, 140);
+  textSize(28);
+  textAlign(CENTER, CENTER);
+  text('Explanation', width/2, layout.panel.y + 40);
+  
+  fill(30);
+  textSize(18);
+  textAlign(LEFT, TOP);
+  let textX = layout.panel.x + 30;
+  let textY = layout.panel.y + 80;
+  let textW = layout.panel.w - 60;
+  text(explanationPopup.text || 'Take another look at this concept.', textX, textY, textW, layout.panel.h - 130);
+  
+  if (mouseX > layout.button.x && mouseX < layout.button.x + layout.button.w &&
+      mouseY > layout.button.y && mouseY < layout.button.y + layout.button.h) {
+    fill(90, 180, 120);
+  } else {
+    fill(70, 160, 100);
+  }
+  noStroke();
+  rect(layout.button.x, layout.button.y, layout.button.w, layout.button.h, 8);
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(20);
+  text('Continue', layout.button.x + layout.button.w/2, layout.button.y + layout.button.h/2);
+}
+
+function showExplanationPopup(text, onClose) {
+  explanationPopup = {
+    text: text || 'Take another look at this concept.',
+    onClose: onClose || null
+  };
+}
+
+function getSlideOverlayLayout() {
+  let panelW = width - 120;
+  let panelH = height - 160;
+  let panelX = width/2 - panelW/2;
+  let panelY = height/2 - panelH/2;
+  let imagePadding = 40;
+  let imageX = panelX + imagePadding;
+  let imageY = panelY + 80;
+  let imageW = panelW - imagePadding * 2;
+  let imageH = panelH - 160;
+  let btnW = 150;
+  let btnH = 48;
+  let btnY = panelY + panelH - btnH - 30;
+  return {
+    panel: { x: panelX, y: panelY, w: panelW, h: panelH },
+    image: { x: imageX, y: imageY, w: imageW, h: imageH },
+    prevButton: { x: panelX + 40, y: btnY, w: btnW, h: btnH },
+    nextButton: { x: panelX + panelW - btnW - 40, y: btnY, w: btnW, h: btnH },
+    skipButton: { x: panelX + panelW - 120, y: panelY + 20, w: 100, h: 36 }
+  };
+}
+
+function drawSlideOverlay() {
+  if (!slideOverlay) return;
+  let layout = getSlideOverlayLayout();
+  push();
+  fill(0, 0, 0, 200);
+  rect(0, 0, width, height);
+  pop();
+  
+  fill(255);
+  stroke(40, 80, 140);
+  strokeWeight(3);
+  rect(layout.panel.x, layout.panel.y, layout.panel.w, layout.panel.h, 18);
+  
+  noStroke();
+  fill(30, 60, 110);
+  textAlign(LEFT, CENTER);
+  textSize(26);
+  text('Level ' + slideOverlay.level + ' Briefing', layout.panel.x + 30, layout.panel.y + 40);
+  
+  fill(80);
+  textSize(16);
+  textAlign(LEFT, CENTER);
+  let indicator = 'Slide ' + (slideOverlay.index + 1) + ' of ' + slideOverlay.slides.length;
+  text(indicator, layout.panel.x + 30, layout.panel.y + 70);
+  
+  let img = slideOverlay.slides[slideOverlay.index];
+  push();
+  rectMode(CORNER);
+  noStroke();
+  fill(245);
+  rect(layout.image.x, layout.image.y, layout.image.w, layout.image.h, 12);
+  if (img && !img.failed && img.complete && (img.naturalWidth > 0 || img.loaded)) {
+    let sourceW = img.naturalWidth || img.width || 1;
+    let sourceH = img.naturalHeight || img.height || 1;
+    let ratio = min(layout.image.w / sourceW, layout.image.h / sourceH);
+    let drawW = sourceW * ratio;
+    let drawH = sourceH * ratio;
+    let dx = layout.image.x + (layout.image.w - drawW) / 2;
+    let dy = layout.image.y + (layout.image.h - drawH) / 2;
+    drawingContext.save();
+    drawingContext.beginPath();
+    drawingContext.rect(layout.image.x, layout.image.y, layout.image.w, layout.image.h);
+    drawingContext.clip();
+    drawingContext.drawImage(img, dx, dy, drawW, drawH);
+    drawingContext.restore();
+  } else {
+    fill(120);
+    textAlign(CENTER, CENTER);
+    textSize(18);
+    let msg = (img && img.failed) ? 'Failed to load slide' : 'Loading slide...';
+    text(msg, layout.image.x + layout.image.w/2, layout.image.y + layout.image.h/2);
+  }
+  pop();
+  
+  let nextLabel = slideOverlay.index >= slideOverlay.slides.length - 1 ? 'Start Level' : 'Next';
+  
+  // Skip button
+  let skipHover = mouseX > layout.skipButton.x && mouseX < layout.skipButton.x + layout.skipButton.w &&
+                  mouseY > layout.skipButton.y && mouseY < layout.skipButton.y + layout.skipButton.h;
+  stroke(200, 80, 80);
+  strokeWeight(2);
+  if (skipHover) {
+    fill(255, 150, 150);
+  } else {
+    fill(245, 120, 120);
+  }
+  rect(layout.skipButton.x, layout.skipButton.y, layout.skipButton.w, layout.skipButton.h, 10);
+  noStroke();
+  fill(30);
+  textAlign(CENTER, CENTER);
+  textSize(16);
+  text('Skip', layout.skipButton.x + layout.skipButton.w/2, layout.skipButton.y + layout.skipButton.h/2);
+  
+  // Prev button
+  let prevEnabled = slideOverlay.index > 0;
+  let prevHover = prevEnabled &&
+                  mouseX > layout.prevButton.x && mouseX < layout.prevButton.x + layout.prevButton.w &&
+                  mouseY > layout.prevButton.y && mouseY < layout.prevButton.y + layout.prevButton.h;
+  stroke(prevEnabled ? color(50, 110, 170) : color(120));
+  strokeWeight(2);
+  if (prevHover) {
+    fill(120, 200, 255);
+  } else if (prevEnabled) {
+    fill(90, 170, 230);
+  } else {
+    fill(160);
+  }
+  rect(layout.prevButton.x, layout.prevButton.y, layout.prevButton.w, layout.prevButton.h, 12);
+  noStroke();
+  fill(prevEnabled ? 20 : 90);
+  textSize(20);
+  text('Back', layout.prevButton.x + layout.prevButton.w/2, layout.prevButton.y + layout.prevButton.h/2);
+  
+  // Next button
+  let nextHover = mouseX > layout.nextButton.x && mouseX < layout.nextButton.x + layout.nextButton.w &&
+                  mouseY > layout.nextButton.y && mouseY < layout.nextButton.y + layout.nextButton.h;
+  stroke(60, 140, 100);
+  strokeWeight(2);
+  if (nextHover) {
+    fill(140, 240, 190);
+  } else {
+    fill(90, 210, 150);
+  }
+  rect(layout.nextButton.x, layout.nextButton.y, layout.nextButton.w, layout.nextButton.h, 12);
+  noStroke();
+  fill(20, 50, 30);
+  text(nextLabel, layout.nextButton.x + layout.nextButton.w/2, layout.nextButton.y + layout.nextButton.h/2);
+}
+
+function showSlidesForLevel(lvl, onComplete) {
+  const slides = (slideImages[lvl] || []).filter(img => !!img);
+  if (slides.length === 0) {
+    if (typeof onComplete === 'function') onComplete();
+    return;
+  }
+  slideOverlay = {
+    level: lvl,
+    index: 0,
+    slides: slides,
+    onComplete: typeof onComplete === 'function' ? onComplete : null
+  };
+}
+
+function finishSlideOverlay() {
+  if (!slideOverlay) return;
+  let cb = slideOverlay.onComplete;
+  slideOverlay = null;
+  if (typeof cb === 'function') cb();
+}
+
+function handleSlideOverlayClick() {
+  if (!slideOverlay) return false;
+  let layout = getSlideOverlayLayout();
+  // Skip button
+  if (mouseX > layout.skipButton.x && mouseX < layout.skipButton.x + layout.skipButton.w &&
+      mouseY > layout.skipButton.y && mouseY < layout.skipButton.y + layout.skipButton.h) {
+    finishSlideOverlay();
+    return true;
+  }
+  // Prev button
+  if (mouseX > layout.prevButton.x && mouseX < layout.prevButton.x + layout.prevButton.w &&
+      mouseY > layout.prevButton.y && mouseY < layout.prevButton.y + layout.prevButton.h) {
+    if (slideOverlay.index > 0) {
+      slideOverlay.index--;
+    }
+    return true;
+  }
+  // Next button
+  if (mouseX > layout.nextButton.x && mouseX < layout.nextButton.x + layout.nextButton.w &&
+      mouseY > layout.nextButton.y && mouseY < layout.nextButton.y + layout.nextButton.h) {
+    if (slideOverlay.index >= slideOverlay.slides.length - 1) {
+      finishSlideOverlay();
+    } else {
+      slideOverlay.index++;
+    }
+    return true;
+  }
+  return false;
+}
+
+// Game variables
+let gameState = 'menu'; // menu, practiceSelect, practice, learning, gameover, question, levelquestion, victory
 let player;
 let platforms = [];
 let enemies = [];
@@ -49,6 +299,7 @@ let angleInput = 45;
 let distanceInput = 100;
 let score = 0;
 let level = 1;
+let highestLevelUnlocked = 1;
 // Player color selection (RGB array)
 let playerColor = [65, 105, 225]; // default royal blue
 let playerColorOptions = [
@@ -72,9 +323,322 @@ let startY = 0;
 let nextLevelY = 0;
 let lastPlatformSide = 'left';
 let trigFacts = []; // Facts shown during climbing
-let questionsData = null;
 // Track the highest point (minimum y) the player has reached during a run/level
 let maxHeightReached = Infinity;
+
+const level1Data = {
+  "level": 1,
+  "topic": "Foundations (Right-Triangle Trig)",
+  "facts": [
+    "The hypotenuse is always opposite the right angle.",
+    "The hypotenuse is the longest side in a right triangle.",
+    "sin(θ) = Opposite / Hypotenuse.",
+    "cos(θ) = Adjacent / Hypotenuse.",
+    "tan(θ) = Opposite / Adjacent."
+  ],
+  "questions": [
+    {
+      "question": "Which side of a right triangle is the hypotenuse?",
+      "options": ["The vertical side", "The longest side", "The base", "The shortest side"],
+      "answer": "The longest side",
+      "explanation": "The hypotenuse is always opposite the right angle and is the longest side."
+    },
+    {
+      "question": "In a 30-60-90 triangle, if the shortest side is 3, what is the hypotenuse?",
+      "options": ["6", "3√3", "3√2", "9"],
+      "answer": "6",
+      "explanation": "In a 30-60-90 triangle, the hypotenuse is twice the shortest side."
+    },
+    {
+      "question": "sin(θ) is equal to:",
+      "options": ["Opposite / Hypotenuse", "Adjacent / Hypotenuse", "Opposite / Adjacent", "Hypotenuse / Opposite"],
+      "answer": "Opposite / Hypotenuse",
+      "explanation": "By definition, sin(θ) = Opposite / Hypotenuse."
+    },
+    {
+      "question": "cos(θ) is equal to:",
+      "options": ["Adjacent / Hypotenuse", "Opposite / Hypotenuse", "Opposite / Adjacent", "Hypotenuse / Adjacent"],
+      "answer": "Adjacent / Hypotenuse",
+      "explanation": "By definition, cos(θ) = Adjacent / Hypotenuse."
+    },
+    {
+      "question": "tan(θ) is equal to:",
+      "options": ["Opposite / Adjacent", "Adjacent / Hypotenuse", "Hypotenuse / Opposite", "Opposite / Hypotenuse"],
+      "answer": "Opposite / Adjacent",
+      "explanation": "By definition, tan(θ) = Opposite / Adjacent."
+    },
+    {
+      "question": "In a 45-45-90 triangle, the hypotenuse is:",
+      "options": ["√2 times a leg", "Equal to a leg", "Twice a leg", "Half a leg"],
+      "answer": "√2 times a leg",
+      "explanation": "For a 45-45-90 triangle, the hypotenuse = leg × √2."
+    },
+    {
+      "question": "If one leg of a right triangle is 5 and the other leg is 12, what is the hypotenuse?",
+      "options": ["13", "10", "12", "15"],
+      "answer": "13",
+      "explanation": "Use Pythagoras: √(5² + 12²) = √(25 + 144) = √169 = 13."
+    },
+    {
+      "question": "Which of these is an example of an angle of elevation?",
+      "options": ["Looking up at the top of a building", "Looking down at your shoes", "Horizontal line of sight", "Looking in a mirror"],
+      "answer": "Looking up at the top of a building",
+      "explanation": "Angle of elevation is the angle between horizontal and line of sight looking upward."
+    },
+    {
+      "question": "Which of these is an example of an angle of depression?",
+      "options": ["Looking down at the street from a balcony", "Looking up at a tree", "Looking straight ahead", "Standing on flat ground"],
+      "answer": "Looking down at the street from a balcony",
+      "explanation": "Angle of depression is the angle between horizontal and line of sight looking downward."
+    },
+    {
+      "question": "In a right triangle, the side opposite a 90° angle is:",
+      "options": ["Hypotenuse", "Adjacent side", "Opposite side", "Base"],
+      "answer": "Hypotenuse",
+      "explanation": "By definition, the hypotenuse is opposite the right angle."
+    }
+  ]
+};
+
+const level2Data = {
+  "level": 2,
+  "topic": "Graphs of Trig Functions",
+  "facts": [
+    "The sine and cosine graphs have a period of 2π.",
+    "The tangent graph has a period of π.",
+    "The amplitude of y = sin(x) or y = cos(x) is 1.",
+    "Tangent has vertical asymptotes where cos(x) = 0.",
+    "Cosine graph starts at its maximum (y = 1), sine starts at 0."
+  ],
+  "questions": [
+    {
+      "question": "What is the period of y = sin(x)?",
+      "options": ["2π", "π", "π/2", "4π"],
+      "answer": "2π",
+      "explanation": "The sine function repeats every 2π units along the x-axis."
+    },
+    {
+      "question": "What is the amplitude of y = cos(x)?",
+      "options": ["1", "0.5", "2", "π"],
+      "answer": "1",
+      "explanation": "Amplitude is the maximum height from the center; for cosine it's 1."
+    },
+    {
+      "question": "The tangent function is undefined where:",
+      "options": ["cos(x) = 0", "sin(x) = 0", "x = 0", "tan(x) = 0"],
+      "answer": "cos(x) = 0",
+      "explanation": "Tangent = sin(x)/cos(x), so it is undefined when cos(x) = 0."
+    },
+    {
+      "question": "Which trig graph starts at y = 1?",
+      "options": ["Cosine", "Sine", "Tangent", "Cotangent"],
+      "answer": "Cosine",
+      "explanation": "Cosine graph starts at its maximum value y = 1 when x = 0."
+    },
+    {
+      "question": "Which trig graph starts at y = 0?",
+      "options": ["Sine", "Cosine", "Tangent", "Cosecant"],
+      "answer": "Sine",
+      "explanation": "Sine graph starts at 0 when x = 0."
+    },
+    {
+      "question": "What is the period of y = tan(x)?",
+      "options": ["π", "2π", "π/2", "4π"],
+      "answer": "π",
+      "explanation": "Tangent repeats every π units."
+    },
+    {
+      "question": "Amplitude of tangent function is:",
+      "options": ["Undefined", "1", "0", "π"],
+      "answer": "Undefined",
+      "explanation": "Tangent doesn't have a maximum/minimum; amplitude is undefined."
+    },
+    {
+      "question": "Vertical asymptotes of tan(x) occur at:",
+      "options": ["x = π/2 + nπ", "x = nπ", "x = nπ/2", "x = 0 only"],
+      "answer": "x = π/2 + nπ",
+      "explanation": "Tangent is undefined where cos(x) = 0 → x = π/2 + nπ."
+    },
+    {
+      "question": "If y = sin(x), what is y when x = π?",
+      "options": ["0", "1", "-1", "π"],
+      "answer": "0",
+      "explanation": "Sine of π is 0; sin(π) = 0."
+    },
+    {
+      "question": "If y = cos(x), what is y when x = π/2?",
+      "options": ["0", "1", "-1", "π/2"],
+      "answer": "0",
+      "explanation": "Cosine of π/2 is 0; cos(π/2) = 0."
+    }
+  ]
+};
+
+const level3Data = {
+  "level": 3,
+  "topic": "Radians & Unit Circle",
+  "facts": [
+    "The unit circle has a radius of 1.",
+    "cos(θ) is the x-coordinate, sin(θ) is the y-coordinate.",
+    "360° = 2π radians; 180° = π radians.",
+    "Quadrant signs: I (+,+), II (-,+), III (-,-), IV (+,-).",
+    "Reference angles allow you to find trig values of any angle."
+  ],
+  "questions": [
+    {
+      "question": "How many radians are in a full circle?",
+      "options": ["2π", "π", "360", "180"],
+      "answer": "2π",
+      "explanation": "A full circle is 360° = 2π radians."
+    },
+    {
+      "question": "180° is equal to how many radians?",
+      "options": ["π", "2π", "π/2", "4π"],
+      "answer": "π",
+      "explanation": "180° = π radians."
+    },
+    {
+      "question": "If an angle is 60°, how many radians is that?",
+      "options": ["π/3", "π/2", "2π/3", "π/4"],
+      "answer": "π/3",
+      "explanation": "Convert degrees to radians: 60 × π/180 = π/3."
+    },
+    {
+      "question": "In the unit circle, what are the coordinates for θ = 0°?",
+      "options": ["(1,0)", "(0,1)", "(-1,0)", "(0,-1)"],
+      "answer": "(1,0)",
+      "explanation": "At 0°, the point on the unit circle is (cos0°, sin0°) = (1,0)."
+    },
+    {
+      "question": "cos(θ) corresponds to:",
+      "options": ["x-coordinate", "y-coordinate", "radius", "angle"],
+      "answer": "x-coordinate",
+      "explanation": "cos(θ) = x-coordinate of the point on the unit circle."
+    },
+    {
+      "question": "sin(θ) corresponds to:",
+      "options": ["y-coordinate", "x-coordinate", "radius", "angle"],
+      "answer": "y-coordinate",
+      "explanation": "sin(θ) = y-coordinate of the point on the unit circle."
+    },
+    {
+      "question": "Which quadrant has sin > 0 and cos < 0?",
+      "options": ["Quadrant II", "Quadrant I", "Quadrant III", "Quadrant IV"],
+      "answer": "Quadrant II",
+      "explanation": "In Quadrant II, x < 0 (cos < 0), y > 0 (sin > 0)."
+    },
+    {
+      "question": "The reference angle for 150° is:",
+      "options": ["30°", "60°", "45°", "90°"],
+      "answer": "30°",
+      "explanation": "Reference angle = 180° - 150° = 30°."
+    },
+    {
+      "question": "cos(45°) equals:",
+      "options": ["√2/2", "1/2", "√3/2", "1"],
+      "answer": "√2/2",
+      "explanation": "For a 45° angle on the unit circle, cos(45°) = √2/2."
+    },
+    {
+      "question": "sin(30°) equals:",
+      "options": ["1/2", "√3/2", "1", "0"],
+      "answer": "1/2",
+      "explanation": "For a 30° angle, sin(30°) = 1/2."
+    }
+  ]
+};
+
+const level4Data = {
+  "level": 4,
+  "topic": "Identities & Inverse Trig",
+  "facts": [
+    "sin²(θ) + cos²(θ) = 1",
+    "1 + tan²(θ) = sec²(θ)",
+    "1 + cot²(θ) = csc²(θ)",
+    "tan(θ) = sin(θ)/cos(θ), cot(θ) = cos(θ)/sin(θ)",
+    "sin⁻¹(x), cos⁻¹(x), tan⁻¹(x) give angles from ratios"
+  ],
+  "questions": [
+    {
+      "question": "sin²(θ) + cos²(θ) equals:",
+      "options": ["1", "tan²(θ)", "sec²(θ)", "0"],
+      "answer": "1",
+      "explanation": "By Pythagorean identity, sin²(θ) + cos²(θ) = 1."
+    },
+    {
+      "question": "1 + tan²(θ) equals:",
+      "options": ["sec²(θ)", "sin²(θ)", "cos²(θ)", "csc²(θ)"],
+      "answer": "sec²(θ)",
+      "explanation": "From the Pythagorean identity: 1 + tan²(θ) = sec²(θ)."
+    },
+    {
+      "question": "1 + cot²(θ) equals:",
+      "options": ["csc²(θ)", "sec²(θ)", "sin²(θ)", "cos²(θ)"],
+      "answer": "csc²(θ)",
+      "explanation": "From the Pythagorean identity: 1 + cot²(θ) = csc²(θ)."
+    },
+    {
+      "question": "tan(θ) equals:",
+      "options": ["sin(θ)/cos(θ)", "cos(θ)/sin(θ)", "1/sin(θ)", "1/cos(θ)"],
+      "answer": "sin(θ)/cos(θ)",
+      "explanation": "By quotient identity, tan(θ) = sin(θ)/cos(θ)."
+    },
+    {
+      "question": "cot(θ) equals:",
+      "options": ["cos(θ)/sin(θ)", "sin(θ)/cos(θ)", "1/sin(θ)", "1/cos(θ)"],
+      "answer": "cos(θ)/sin(θ)",
+      "explanation": "By quotient identity, cot(θ) = cos(θ)/sin(θ)."
+    },
+    {
+      "question": "sin⁻¹(1/2) equals:",
+      "options": ["30°", "60°", "45°", "90°"],
+      "answer": "30°",
+      "explanation": "The angle whose sine = 1/2 is 30°."
+    },
+    {
+      "question": "cos⁻¹(0) equals:",
+      "options": ["90°", "0°", "180°", "45°"],
+      "answer": "90°",
+      "explanation": "The angle whose cosine = 0 is 90°."
+    },
+    {
+      "question": "tan⁻¹(1) equals:",
+      "options": ["45°", "30°", "60°", "90°"],
+      "answer": "45°",
+      "explanation": "The angle whose tangent = 1 is 45°."
+    },
+    {
+      "question": "Which identity is correct?",
+      "options": ["1 + tan²(θ) = sec²(θ)", "sin²(θ) - cos²(θ) = 1", "tan²(θ) + 1 = csc²(θ)", "cos²(θ) + cot²(θ) = 1"],
+      "answer": "1 + tan²(θ) = sec²(θ)",
+      "explanation": "This is a Pythagorean identity."
+    },
+    {
+      "question": "Which is the reciprocal of sine?",
+      "options": ["Cosecant", "Secant", "Cotangent", "Cosine"],
+      "answer": "Cosecant",
+      "explanation": "Cosecant = 1/sin(θ), the reciprocal of sine."
+    }
+  ]
+};
+
+const levelConfigs = [level1Data, level2Data, level3Data, level4Data];
+const TOTAL_LEVELS = levelConfigs.length;
+const levelSlideManifest = {
+  1: ['Slides/1A.png', 'Slides/1B.png', 'Slides/1C.png'],
+  2: ['Slides/2A.png', 'Slides/2B.png', 'Slides/2C.png'],
+  3: ['Slides/3A.png', 'Slides/3B.png', 'Slides/3C.png'],
+  4: ['Slides/4A.png', 'Slides/4B.png', 'Slides/4C.png']
+};
+
+let slideImages = {};
+let slideOverlay = null;
+
+function getLevelConfig(lvl) {
+  return levelConfigs[lvl - 1] || null;
+}
+
+let explanationPopup = null;
 
 // Audio
 let musicAudioElements = [];
@@ -111,374 +675,7 @@ function setup() {
   textAlign(CENTER, CENTER);
   setupLearningSteps();
   initAudio();
-  // Questions data inlined to avoid async loading. This is the contents of questions.json.
-  questionsData = {
-    "levels": [
-      {
-        "id": 1,
-        "topic": "Right Triangles and the Hypotenuse",
-        "facts": [
-          "The hypotenuse is the side opposite the right angle.",
-          "The Pythagorean theorem says a² + b² = c².",
-          "The hypotenuse is always the longest side in a right triangle."
-        ],
-        "questions": [
-          {
-            "question": "Which side of a right triangle is the hypotenuse?",
-            "options": ["The vertical side", "The longest side", "The base", "The shortest side"],
-            "answer": "The longest side"
-          },
-          {
-            "question": "If one leg is 5 and the other is 12, what is the hypotenuse?",
-            "options": ["12", "15", "10", "13"],
-            "answer": "13"
-          },
-          {
-            "question": "In a² + b² = c², which variable represents the hypotenuse?",
-            "options": ["a", "θ", "c", "b"],
-            "answer": "c"
-          }
-        ]
-      },
-      {
-        "id": 2,
-        "topic": "Sine, Cosine, and Tangent Basics",
-        "facts": [
-          "sin(θ) = Opposite / Hypotenuse.",
-          "cos(θ) = Adjacent / Hypotenuse.",
-          "tan(θ) = Opposite / Adjacent."
-        ],
-        "questions": [
-          {
-            "question": "Which ratio equals sin(θ)?",
-            "options": ["Hypotenuse/Opposite", "Opposite/Hypotenuse", "Opposite/Adjacent", "Adjacent/Hypotenuse"],
-            "answer": "Opposite/Hypotenuse"
-          },
-          {
-            "question": "tan(θ) compares which two sides?",
-            "options": ["None of these", "Adjacent and Hypotenuse", "Opposite and Adjacent", "Opposite and Hypotenuse"],
-            "answer": "Opposite and Adjacent"
-          },
-          {
-            "question": "cos(θ) equals what ratio?",
-            "options": ["1/cos(θ)", "Opposite/Hypotenuse", "Adjacent/Hypotenuse", "Adjacent/Opposite"],
-            "answer": "Adjacent/Hypotenuse"
-          }
-        ]
-      },
-      {
-        "id": 3,
-        "topic": "Angles and the Unit Circle",
-        "facts": [
-          "The unit circle has a radius of 1.",
-          "cos(θ) is the x-coordinate on the unit circle.",
-          "sin(θ) is the y-coordinate on the unit circle."
-        ],
-        "questions": [
-          {
-            "question": "What is the radius of the unit circle?",
-            "options": ["π", "0", "1", "2"],
-            "answer": "1"
-          },
-          {
-            "question": "In the unit circle, sin(θ) corresponds to:",
-            "options": ["The radius", "The tangent", "The y-coordinate", "The x-coordinate"],
-            "answer": "The y-coordinate"
-          },
-          {
-            "question": "A full rotation is how many radians?",
-            "options": ["π/2", "2π", "π", "4π"],
-            "answer": "2π"
-          }
-        ]
-      },
-      {
-        "id": 4,
-        "topic": "Degrees and Radians",
-        "facts": [
-          "There are 360° in a circle.",
-          "π radians = 180°.",
-          "To convert degrees to radians, multiply by π/180."
-        ],
-        "questions": [
-          {
-            "question": "180° is equal to how many radians?",
-            "options": ["π", "3π/2", "π/4", "2π"],
-            "answer": "π"
-          },
-          {
-            "question": "How many degrees are in π/2 radians?",
-            "options": ["60°", "45°", "180°", "90°"],
-            "answer": "90°"
-          },
-          {
-            "question": "What is 60° in radians?",
-            "options": ["π/2", "π/3", "π/4", "π/6"],
-            "answer": "π/3"
-          }
-        ]
-      },
-      {
-        "id": 5,
-        "topic": "Special Triangles",
-        "facts": [
-          "A 45-45-90 triangle has sides in the ratio 1:1:√2.",
-          "A 30-60-90 triangle has sides in the ratio 1:√3:2.",
-          "These triangles are often used to find exact trig values."
-        ],
-        "questions": [
-          {
-            "question": "In a 45-45-90 triangle, the hypotenuse is:",
-            "options": ["Equal to a leg", "Half a leg", "√2 times a leg", "Twice a leg"],
-            "answer": "√2 times a leg"
-          },
-          {
-            "question": "In a 30-60-90 triangle, the longest side is:",
-            "options": ["Equal to the shortest side", "Twice the shortest side", "Half the shortest side", "√3 times the shortest side"],
-            "answer": "Twice the shortest side"
-          },
-          {
-            "question": "If the shortest side in a 30-60-90 triangle is 3, what is the hypotenuse?",
-            "options": ["3√3", "9", "6", "3√2"],
-            "answer": "6"
-          }
-        ]
-      },
-      {
-        "id": 6,
-        "topic": "Inverse Trig Functions",
-        "facts": [
-          "sin⁻¹(x) gives the angle whose sine is x.",
-          "cos⁻¹(x) gives the angle whose cosine is x.",
-          "tan⁻¹(x) gives the angle whose tangent is x."
-        ],
-        "questions": [
-          {
-            "question": "What does sin⁻¹(1/2) equal?",
-            "options": ["60°", "90°", "30°", "45°"],
-            "answer": "30°"
-          },
-          {
-            "question": "If cos⁻¹(x) = 0°, what is x?",
-            "options": ["√3/2", "1", "-1", "0"],
-            "answer": "1"
-          },
-          {
-            "question": "tan⁻¹(1) equals:",
-            "options": ["60°", "30°", "90°", "45°"],
-            "answer": "45°"
-          }
-        ]
-      },
-      {
-        "id": 7,
-        "topic": "Trigonometric Identities",
-        "facts": [
-          "sin²(θ) + cos²(θ) = 1.",
-          "1 + tan²(θ) = sec²(θ).",
-          "1 + cot²(θ) = csc²(θ)."
-        ],
-        "questions": [
-          {
-            "question": "sin²(θ) + cos²(θ) equals:",
-            "options": ["1", "tan²(θ)", "sec²(θ)", "0"],
-            "answer": "1"
-          },
-          {
-            "question": "1 + tan²(θ) equals:",
-            "options": ["csc²(θ)", "sec²(θ)", "sin²(θ)", "cos²(θ)"],
-            "answer": "sec²(θ)"
-          },
-          {
-            "question": "Which identity equals csc²(θ)?",
-            "options": ["1/sin²(θ)", "1 + cot²(θ)", "1 - cos²(θ)", "1 + tan²(θ)"],
-            "answer": "1 + cot²(θ)"
-          }
-        ]
-      },
-      {
-        "id": 8,
-        "topic": "Graphs of Trig Functions",
-        "facts": [
-          "The sine and cosine graphs are periodic with a period of 2π.",
-          "The tangent graph repeats every π.",
-          "The amplitude of y = sin(x) or cos(x) is 1."
-        ],
-        "questions": [
-          {
-            "question": "What is the period of y = sin(x)?",
-            "options": ["π/2", "2π", "π", "4π"],
-            "answer": "2π"
-          },
-          {
-            "question": "What is the amplitude of y = cos(x)?",
-            "options": ["π", "2", "1", "0.5"],
-            "answer": "1"
-          },
-          {
-            "question": "The tangent function is undefined where:",
-            "options": ["tan(x) = 0", "cos(x) = 0", "x = 0", "sin(x) = 0"],
-            "answer": "cos(x) = 0"
-          }
-        ]
-      },
-      {
-        "id": 9,
-        "topic": "Law of Sines and Cosines",
-        "facts": [
-          "The Law of Sines: a/sin(A) = b/sin(B) = c/sin(C).",
-          "The Law of Cosines: c² = a² + b² - 2ab cos(C).",
-          "These laws apply to any triangle, not just right ones."
-        ],
-        "questions": [
-          {
-            "question": "Which formula represents the Law of Sines?",
-            "options": ["a² + b² = c²", "sin(A)/a = cos(B)/b", "a/sin(A) = b/sin(B) = c/sin(C)", "c² = a² + b² - 2ab cos(C)"],
-            "answer": "a/sin(A) = b/sin(B) = c/sin(C)"
-          },
-          {
-            "question": "Law of Cosines can be used when:",
-            "options": ["You have only one side", "The triangle is isosceles", "You know two sides and the included angle", "You know all three angles"],
-            "answer": "You know two sides and the included angle"
-          },
-          {
-            "question": "If a = 3, b = 4, and C = 90°, what is c?",
-            "options": ["4.5", "5", "7", "6"],
-            "answer": "5"
-          }
-        ]
-      },
-      {
-        "id": 10,
-        "topic": "Real-World Applications of Trig",
-        "facts": [
-          "Trigonometry helps measure heights and distances using angles.",
-          "Engineers use trig in designing structures and machines.",
-          "Trigonometric functions model sound and light waves."
-        ],
-        "questions": [
-          {
-            "question": "Which of the following fields commonly uses trigonometry?",
-            "options": ["History", "Engineering", "Cooking", "Painting"],
-            "answer": "Engineering"
-          },
-          {
-            "question": "Which trig function models periodic motion like waves?",
-            "options": ["Tangent", "Cosecant", "Sine", "Secant"],
-            "answer": "Sine"
-          },
-          {
-            "question": "Surveyors use trigonometry to:",
-            "options": ["Estimate speed limits", "Measure distances and heights", "Predict weather", "Find color values"],
-            "answer": "Measure distances and heights"
-          }
-        ]
-      }
-    ],
-    "second_chance_questions": [
-      {
-        "question": "If sin(30°) = 1/2, what is cos(60°)?",
-        "options": ["0", "√3/2", "1/2", "1"],
-        "answer": "1/2"
-      },
-      {
-        "question": "tan(45°) equals:",
-        "options": ["√3", "0", "-1", "1"],
-        "answer": "1"
-      },
-      {
-        "question": "cos(0°) equals:",
-        "options": ["0", "1/2", "-1", "1"],
-        "answer": "1"
-      },
-      {
-        "question": "sin(90°) equals:",
-        "options": ["0", "1", "-1", "√3/2"],
-        "answer": "1"
-      },
-      {
-        "question": "π radians is equal to how many degrees?",
-        "options": ["45°", "360°", "180°", "90°"],
-        "answer": "180°"
-      },
-      {
-        "question": "The reciprocal of sine is:",
-        "options": ["Cosecant", "Secant", "Cotangent", "Cosine"],
-        "answer": "Cosecant"
-      },
-      {
-        "question": "The reciprocal of cosine is:",
-        "options": ["Tangent", "Secant", "Cotangent", "Cosecant"],
-        "answer": "Secant"
-      },
-      {
-        "question": "sin²(θ) + cos²(θ) equals:",
-        "options": ["tan²(θ)", "1", "0", "sec²(θ)"],
-        "answer": "1"
-      },
-      {
-        "question": "Which trig function is even?",
-        "options": ["Tangent", "Secant", "Sine", "Cosine"],
-        "answer": "Cosine"
-      },
-      {
-        "question": "Which trig function is odd?",
-        "options": ["Cosecant", "Sine", "Secant", "Cosine"],
-        "answer": "Sine"
-      },
-      {
-        "question": "If sin(θ) = 0, θ could be:",
-        "options": ["45°", "0°, 180°, or 360°", "30°", "90°"],
-        "answer": "0°, 180°, or 360°"
-      },
-      {
-        "question": "tan(0°) equals:",
-        "options": ["Undefined", "0", "1", "∞"],
-        "answer": "0"
-      },
-      {
-        "question": "cos(90°) equals:",
-        "options": ["√3/2", "0", "-1", "1"],
-        "answer": "0"
-      },
-      {
-        "question": "If cos(θ) = 4/5, what is sin(θ) (θ acute)?",
-        "options": ["2/5", "3/5", "1/5", "5/4"],
-        "answer": "3/5"
-      },
-      {
-        "question": "sin(270°) equals:",
-        "options": ["0", "-1", "1", "√3/2"],
-        "answer": "-1"
-      },
-      {
-        "question": "tan(90°) is:",
-        "options": ["Undefined", "1", "0", "-1"],
-        "answer": "Undefined"
-      },
-      {
-        "question": "The amplitude of y = 3sin(x) is:",
-        "options": ["1", "π", "3", "2"],
-        "answer": "3"
-      },
-      {
-        "question": "The period of y = sin(x) is:",
-        "options": ["π/2", "2π", "π", "4π"],
-        "answer": "2π"
-      },
-      {
-        "question": "Which ratio defines tangent?",
-        "options": ["Adjacent/Hypotenuse", "Opposite/Adjacent", "Opposite/Hypotenuse", "Hypotenuse/Adjacent"],
-        "answer": "Opposite/Adjacent"
-      },
-      {
-        "question": "If tan(θ) = 1, θ could be:",
-        "options": ["60°", "0°", "45°", "90°"],
-        "answer": "45°"
-      }
-    ]
-  };
-  console.log('Inlined questionsData');
+  loadSlideAssets();
 }
 
 function initAudio() {
@@ -542,6 +739,27 @@ function stopMusic() {
   }
 }
 
+function loadSlideAssets() {
+  slideImages = {};
+  for (let key in levelSlideManifest) {
+    if (!levelSlideManifest.hasOwnProperty(key)) continue;
+    let lvl = parseInt(key, 10);
+    if (isNaN(lvl)) continue;
+    slideImages[lvl] = levelSlideManifest[key].map(path => {
+      let img = new Image();
+      img.loaded = false;
+      img.failed = false;
+      img.onload = () => { img.loaded = true; };
+      img.onerror = () => {
+        img.failed = true;
+        console.warn('Failed to load slide', path);
+      };
+      img.src = path;
+      return img;
+    });
+  }
+}
+
 function setupLearningSteps() {
   learningSteps = [
     {
@@ -601,6 +819,8 @@ function draw() {
   if (gameState === 'menu') {
     drawMenu();
     if (showColorPopup) drawColorPopup();
+  } else if (gameState === 'practiceSelect') {
+    drawPracticeSelect();
   } else if (gameState === 'practice') {
     drawPracticeMode();
   } else if (gameState === 'learning') {
@@ -611,6 +831,15 @@ function draw() {
     drawQuestion();
   } else if (gameState === 'levelquestion') {
     drawLevelQuestion();
+  } else if (gameState === 'victory') {
+    drawVictory();
+  }
+  
+  if (slideOverlay) {
+    drawSlideOverlay();
+  }
+  if (explanationPopup) {
+    drawExplanationPopup();
   }
 }
 
@@ -705,6 +934,141 @@ function drawMenu() {
   textStyle(NORMAL);
 }
 
+function getPracticeSelectLayout() {
+  let btnW = 210;
+  let btnH = 125;
+  let cols = min(3, TOTAL_LEVELS);
+  let spacingX = 28;
+  let spacingY = 32;
+  let totalW = cols * btnW + (cols - 1) * spacingX;
+  let startX = width/2 - totalW/2;
+  let startY = 220;
+  let buttons = [];
+  for (let i = 0; i < TOTAL_LEVELS; i++) {
+    let col = i % cols;
+    let row = floor(i / cols);
+    let x = startX + col * (btnW + spacingX);
+    let y = startY + row * (btnH + spacingY);
+    buttons.push({
+      level: i + 1,
+      x: x,
+      y: y,
+      w: btnW,
+      h: btnH,
+      unlocked: i + 1 <= highestLevelUnlocked
+    });
+  }
+  let backButton = {
+    x: width/2 - 120,
+    y: height - 80,
+    w: 240,
+    h: 56
+  };
+  return { buttons, backButton };
+}
+
+function drawPracticeSelect() {
+  // Night-sky gradient background
+  for (let y = 0; y < height; y += 2) {
+    let lerpVal = map(y, 0, height, 0, 1);
+    let r = lerp(30, 90, lerpVal);
+    let g = lerp(40, 140, lerpVal);
+    let b = lerp(80, 200, lerpVal);
+    stroke(r, g, b);
+    line(0, y, width, y);
+  }
+  noStroke();
+  textStyle(NORMAL);
+  
+  // Glass panel
+  fill(255, 255, 255, 25);
+  rect(width/2 - 360, 60, 720, height - 120, 24);
+  fill(255, 255, 255, 90);
+  rect(width/2 - 360, 60, 720, 110, 24, 24, 0, 0);
+  
+  fill(20, 35, 65);
+  textAlign(CENTER, CENTER);
+  textSize(42);
+  text('Practice Level Select', width/2, 120);
+  
+  textSize(18);
+  fill(30, 60, 100);
+  text('Choose a level card below. Locked cards show what to beat next.', width/2, 160);
+  
+  let progress = highestLevelUnlocked / TOTAL_LEVELS;
+  let barW = 420;
+  let barH = 16;
+  let barX = width/2 - barW/2;
+  let barY = 180;
+  fill(255, 255, 255, 80);
+  rect(barX, barY, barW, barH, barH/2);
+  fill(120, 210, 130);
+  rect(barX, barY, barW * progress, barH, barH/2);
+  fill(20, 60, 40);
+  textSize(14);
+  text('Unlocked ' + highestLevelUnlocked + ' / ' + TOTAL_LEVELS, width/2, barY + 28);
+  
+  let layout = getPracticeSelectLayout();
+  for (let btn of layout.buttons) {
+    let hover = mouseX > btn.x && mouseX < btn.x + btn.w &&
+                mouseY > btn.y && mouseY < btn.y + btn.h;
+    push();
+    translate(btn.x, btn.y);
+    // shadow
+    fill(0, 0, 0, 40);
+    rect(6, 8, btn.w, btn.h, 18);
+    // card
+    if (!btn.unlocked) {
+      fill(180, 180, 190, hover ? 230 : 210);
+    } else if (hover) {
+      fill(255, 230, 180);
+    } else {
+      fill(255, 250, 230);
+    }
+    stroke(hover ? color(255, 200, 120) : color(230, 224, 210));
+    strokeWeight(2);
+    rect(0, 0, btn.w, btn.h, 18);
+    noStroke();
+    
+    // badge
+    let badgeColor = btn.unlocked ? color(255, 210, 130) : color(200, 200, 210);
+    fill(badgeColor);
+    rect(20, 18, btn.w - 40, 36, 14);
+    fill(35, 40, 55);
+    textAlign(CENTER, CENTER);
+    textSize(18);
+    text('LEVEL ' + btn.level, btn.w/2, 36);
+    
+    // topic text
+    let cfg = getLevelConfig(btn.level);
+    let topic = cfg ? cfg.topic : 'Ready to climb';
+    fill(30, 45, 70);
+    textSize(btn.level === 1 ? 13 : 15);
+    textAlign(CENTER, CENTER);
+    text(topic, btn.w/2, btn.h/2 + 5);
+    
+    // status text
+    fill(btn.unlocked ? color(50, 120, 80) : color(160, 70, 70));
+    textSize(16);
+    let statusText = btn.unlocked ? 'Unlocked' : 'Locked • beat Level ' + highestLevelUnlocked;
+    text(statusText, btn.w/2, btn.h - 28);
+    pop();
+  }
+  
+  // Back button
+  let backHover = mouseX > layout.backButton.x && mouseX < layout.backButton.x + layout.backButton.w &&
+                  mouseY > layout.backButton.y && mouseY < layout.backButton.y + layout.backButton.h;
+  fill(backHover ? color(255, 200, 200) : color(255, 175, 175));
+  stroke(200, 100, 100);
+  strokeWeight(2);
+  rect(layout.backButton.x, layout.backButton.y, layout.backButton.w, layout.backButton.h, 14);
+  noStroke();
+  fill(80, 20, 20);
+  textSize(20);
+  textAlign(CENTER, CENTER);
+  text('← Back to Menu', layout.backButton.x + layout.backButton.w/2, layout.backButton.y + layout.backButton.h/2);
+}
+
 function drawColorPopup() {
   // dim background
   push();
@@ -793,6 +1157,26 @@ function drawGameOver() {
   fill(150, 150, 200);
   rect(width/2 - 100, 400, 200, 60, 10);
   fill(255);
+  textSize(24);
+  text('Back to Menu', width/2, 430);
+}
+
+function drawVictory() {
+  background(40, 90, 60);
+  
+  fill(120, 255, 180);
+  textSize(60);
+  textAlign(CENTER, CENTER);
+  text('YOU WON!', width/2, 200);
+  
+  fill(255);
+  textSize(28);
+  text('Score: ' + score, width/2, 280);
+  text('All ' + TOTAL_LEVELS + ' Levels Complete', width/2, 330);
+  
+  fill(100, 180, 120);
+  rect(width/2 - 120, 400, 240, 60, 12);
+  fill(10, 30, 20);
   textSize(24);
   text('Back to Menu', width/2, 430);
 }
@@ -1168,7 +1552,8 @@ function drawPracticeMode() {
   noStroke();
   textSize(16);
   textAlign(CENTER, CENTER);
-  text('LEVEL ' + (level + 1), width/2, nextLevelY - 10);
+  let goalLabel = level >= TOTAL_LEVELS ? 'FINAL GOAL' : 'LEVEL ' + (level + 1);
+  text(goalLabel, width/2, nextLevelY - 10);
   
   // Draw trig facts
   for (let fact of trigFacts) {
@@ -1325,6 +1710,24 @@ function drawPracticeUI() {
 }
 
 function mousePressed() {
+  if (slideOverlay) {
+    let handled = handleSlideOverlayClick();
+    if (handled && sfx.click) { try { sfx.click.currentTime = 0; sfx.click.play(); } catch(e){} }
+    return;
+  }
+
+  if (explanationPopup) {
+    let layout = getExplanationPopupLayout();
+    if (mouseX > layout.button.x && mouseX < layout.button.x + layout.button.w &&
+        mouseY > layout.button.y && mouseY < layout.button.y + layout.button.h) {
+      if (sfx.click) { try { sfx.click.currentTime = 0; sfx.click.play(); } catch(e){} }
+      let cb = explanationPopup.onClose;
+      explanationPopup = null;
+      if (typeof cb === 'function') cb();
+    }
+    return;
+  }
+
   if (gameState === 'menu') {
     // If popup is showing, let it handle clicks
     if (showColorPopup) {
@@ -1390,8 +1793,8 @@ function mousePressed() {
       return;
     }
     if (mouseX > btnX && mouseX < btnX + btnW && mouseY > py && mouseY < py + btnH) {
-      // start Practice immediately (do not force color pick)
-      startPractice();
+      // open Practice level select screen
+      gameState = 'practiceSelect';
       if (sfx.click) { try { sfx.click.currentTime = 0; sfx.click.play(); } catch(e){} }
       return;
     }
@@ -1403,6 +1806,27 @@ function mousePressed() {
       showColorPopup = true;
       if (sfx.click) { try { sfx.click.currentTime = 0; sfx.click.play(); } catch(e){} }
       return;
+    }
+  } else if (gameState === 'practiceSelect') {
+    let layout = getPracticeSelectLayout();
+    // Back to menu
+    if (mouseX > layout.backButton.x && mouseX < layout.backButton.x + layout.backButton.w &&
+        mouseY > layout.backButton.y && mouseY < layout.backButton.y + layout.backButton.h) {
+      gameState = 'menu';
+      if (sfx.click) { try { sfx.click.currentTime = 0; sfx.click.play(); } catch(e){} }
+      return;
+    }
+    for (let btn of layout.buttons) {
+      if (mouseX > btn.x && mouseX < btn.x + btn.w &&
+          mouseY > btn.y && mouseY < btn.y + btn.h) {
+        if (btn.unlocked) {
+          if (sfx.click) { try { sfx.click.currentTime = 0; sfx.click.play(); } catch(e){} }
+          startPractice(btn.level);
+        } else {
+          if (sfx.wrong) { try { sfx.wrong.currentTime = 0; sfx.wrong.play(); } catch(e){} }
+        }
+        return;
+      }
     }
   } else if (gameState === 'practice') {
     // Allow clicking anywhere on the slider track to start dragging/update
@@ -1506,6 +1930,13 @@ function mousePressed() {
         stopMusic();
       if (sfx.click) { try { sfx.click.currentTime = 0; sfx.click.play(); } catch(e){} }
     }
+  } else if (gameState === 'victory') {
+    if (mouseX > width/2 - 120 && mouseX < width/2 + 120 &&
+        mouseY > 400 && mouseY < 460) {
+      gameState = 'menu';
+      stopMusic();
+      if (sfx.click) { try { sfx.click.currentTime = 0; sfx.click.play(); } catch(e){} }
+    }
   } else if (gameState === 'question') {
     for (let i = 0; i < questionOptions.length; i++) {
       let y = 270 + i * 80;
@@ -1530,6 +1961,7 @@ function mousePressed() {
 }
 
 function mouseDragged() {
+  if (slideOverlay) return;
   if (gameState !== 'practice' && gameState !== 'learning') return;
   if (player.isJumping) return;
   // If the user started dragging a slider, update based on which one
@@ -1553,6 +1985,7 @@ function mouseDragged() {
 }
 
 function mouseReleased() {
+  if (slideOverlay) return;
   // clear dragging state for sliders
   draggingAngle = false;
   draggingDistance = false;
@@ -1589,10 +2022,13 @@ function resetLearningPlayer() {
   // Note: do not clear the `.hit` flag here — once a target is hit it remains recorded
 }
 
-function startPractice() {
+function startPractice(startLevel = 1) {
   gameState = 'practice';
   score = 0;
-  level = 1;
+  let targetLevel = startLevel || 1;
+  targetLevel = constrain(targetLevel, 1, TOTAL_LEVELS);
+  targetLevel = min(targetLevel, highestLevelUnlocked);
+  level = targetLevel;
   cameraY = 0;
   lastPlatformSide = 'left';
   
@@ -1612,6 +2048,7 @@ function startPractice() {
   generateLevelPlatforms();
   // start looping music for practice
   playMusic();
+  showSlidesForLevel(level);
 }
 
 function generateLevelPlatforms() {
@@ -1624,9 +2061,9 @@ function generateLevelPlatforms() {
   
   // If we have structured facts for this level, use them instead of random facts
   let levelFacts = null;
-  if (questionsData && questionsData.levels) {
-    let lvlObj = questionsData.levels.find(l => l.id === level);
-    if (lvlObj && Array.isArray(lvlObj.facts)) levelFacts = lvlObj.facts.slice();
+  let lvlObj = getLevelConfig(level);
+  if (lvlObj && Array.isArray(lvlObj.facts)) {
+    levelFacts = lvlObj.facts.slice();
   }
 
   while (currentY > nextLevelY - 200) {
@@ -1742,6 +2179,7 @@ function generateLevelPlatforms() {
 
 function levelUp() {
   level++;
+  highestLevelUnlocked = max(highestLevelUnlocked, level);
   score += 100;
   showMessage('🎉 Level ' + level + ' Complete! Platforms getting harder...');
   
@@ -1765,7 +2203,15 @@ function levelUp() {
   
   generateLevelPlatforms();
   
+  showSlidesForLevel(level);
   messageTimer = 90;
+}
+
+function handleVictory() {
+  score += 100;
+  stopMusic();
+  gameState = 'victory';
+  messageTimer = 0;
 }
 
 function checkCollisions() {
@@ -1822,14 +2268,32 @@ function checkCollisions() {
   }
 }
 
+function setQuestionFromData(raw) {
+  if (!raw) return;
+  currentQuestion = {
+    question: raw.question || '',
+    explanation: raw.explanation || 'Review this idea before trying again.'
+  };
+  if (Array.isArray(raw.options) && raw.options.length > 0) {
+    questionOptions = raw.options.slice();
+  } else {
+    questionOptions = ['Option A', 'Option B', 'Option C', 'Option D'];
+  }
+  if (raw.hasOwnProperty('answer')) {
+    correctAnswer = questionOptions.indexOf(raw.answer);
+  } else if (typeof raw.correct === 'number') {
+    correctAnswer = constrain(raw.correct, 0, questionOptions.length - 1);
+  } else {
+    correctAnswer = 0;
+  }
+  if (correctAnswer < 0 || correctAnswer >= questionOptions.length) correctAnswer = 0;
+}
+
 function generateQuestion() {
-  // Use second_chance_questions from questions.json if available
-  if (questionsData && Array.isArray(questionsData.second_chance_questions)) {
-    let q = random(questionsData.second_chance_questions);
-    currentQuestion = { question: q.question };
-    questionOptions = q.options.slice();
-    correctAnswer = questionOptions.indexOf(q.answer);
-    if (correctAnswer < 0) correctAnswer = 0;
+  let levelData = getLevelConfig(level);
+  if (levelData && Array.isArray(levelData.questions) && levelData.questions.length > 0) {
+    let q = random(levelData.questions);
+    setQuestionFromData(q);
     return;
   }
 
@@ -1838,107 +2302,105 @@ function generateQuestion() {
     {
       question: 'What does cos(45°) equal?',
       options: ['0.707', '0.5', '1', '0.866'],
-      correct: 0
+      answer: '0.707',
+      explanation: 'cos(45°) = √2/2 ≈ 0.707.'
     },
     {
       question: 'If sin(θ) = 0.5, what is θ?',
       options: ['45°', '30°', '60°', '90°'],
-      correct: 1
+      answer: '30°',
+      explanation: 'sin(30°) = 0.5 in the unit circle.'
     },
     {
       question: 'In a right triangle, what does\n"hypotenuse" mean?',
       options: ['Adjacent side', 'Opposite side', 'Longest side', 'Shortest side'],
-      correct: 2
+      answer: 'Longest side',
+      explanation: 'The hypotenuse is opposite the right angle and is longest.'
     }
   ];
 
-  currentQuestion = random(questions);
-  questionOptions = currentQuestion.options;
-  correctAnswer = currentQuestion.correct;
+  setQuestionFromData(random(questions));
 }
 
 // Generate a question for level completion. Player must answer correctly to advance.
 function generateLevelQuestion() {
-  // Pull level completion questions from questions.json if available
-  if (questionsData && questionsData.levels) {
-    let lvlObj = questionsData.levels.find(l => l.id === level);
-    if (lvlObj && Array.isArray(lvlObj.questions) && lvlObj.questions.length > 0) {
-      let q = random(lvlObj.questions);
-      currentQuestion = { question: q.question };
-      questionOptions = q.options.slice();
-      // convert answer string to index
-      correctAnswer = questionOptions.indexOf(q.answer);
-      if (correctAnswer < 0) correctAnswer = 0;
-      gameState = 'levelquestion';
-      return;
-    }
+  let levelData = getLevelConfig(level);
+  if (levelData && Array.isArray(levelData.questions) && levelData.questions.length > 0) {
+    setQuestionFromData(random(levelData.questions));
+  } else {
+    // fallback to small built-in set
+    let questions = [
+      {
+        question: 'Which ratio is defined as adjacent / hypotenuse?',
+        options: ['sin(θ)', 'cos(θ)', 'tan(θ)', 'cot(θ)'],
+        answer: 'cos(θ)',
+        explanation: 'cos(θ) compares the adjacent side to the hypotenuse.'
+      },
+      {
+        question: 'If Δx = cos(θ) × distance, which trig function gives Δy?',
+        options: ['sin(θ)', 'cos(θ)', 'tan(θ)', 'sec(θ)'],
+        answer: 'sin(θ)',
+        explanation: 'sin(θ) gives the vertical component (Δy).'
+      },
+      {
+        question: 'What is cos(0°)?',
+        options: ['0', '0.5', '1', '-1'],
+        answer: '1',
+        explanation: 'cos(0°) = 1 on the unit circle.'
+      }
+    ];
+    setQuestionFromData(random(questions));
   }
-
-  // fallback to small built-in set
-  let questions = [
-    {
-      question: 'Which ratio is defined as adjacent / hypotenuse?',
-      options: ['sin(θ)', 'cos(θ)', 'tan(θ)', 'cot(θ)'],
-      correct: 1
-    },
-    {
-      question: 'If Δx = cos(θ) × distance, which trig function gives Δy?',
-      options: ['sin(θ)', 'cos(θ)', 'tan(θ)', 'sec(θ)'],
-      correct: 0
-    },
-    {
-      question: 'What is cos(0°)?',
-      options: ['0', '0.5', '1', '-1'],
-      correct: 2
-    }
-  ];
-
-  currentQuestion = random(questions);
-  questionOptions = currentQuestion.options;
-  correctAnswer = currentQuestion.correct;
   gameState = 'levelquestion';
 }
 
 function checkLevelAnswer(selected) {
   if (selected === correctAnswer) {
-    showMessage('✓ Correct! Advancing to next level...');
+    let successMsg = level >= TOTAL_LEVELS
+      ? '✓ Correct! All levels mastered!'
+      : '✓ Correct! Advancing to next level...';
+    showMessage(successMsg);
     if (sfx.correct) { try { sfx.correct.currentTime = 0; sfx.correct.play(); } catch(e){} }
     // Play level complete SFX
     if (sfx.levelcomplete) { try { sfx.levelcomplete.currentTime = 0; sfx.levelcomplete.play(); } catch(e){} }
-    // Advance level and regenerate platforms
-    levelUp();
-    // ensure music restarts for the new practice level
-    stopMusic();
-    playMusic();
-    gameState = 'practice';
-    messageTimer = 60;
+    if (level >= TOTAL_LEVELS) {
+      handleVictory();
+    } else {
+      // Advance level and regenerate platforms
+      levelUp();
+      // ensure music restarts for the new practice level
+      stopMusic();
+      playMusic();
+      gameState = 'practice';
+      messageTimer = 60;
+    }
   } else {
-    // Incorrect: restart the current level
-    showMessage('❌ Incorrect — restarting level...');
     if (sfx.wrong) { try { sfx.wrong.currentTime = 0; sfx.wrong.play(); } catch(e){} }
-    // Reset platforms and player to the level's start platform
-    // Preserve current `level` value; rebuild the platforms for this level
-    platforms = [];
-    let platformWidth = getPlatformWidth(level);
-    // Use existing startY (set when the level began) as the spawn Y
-    let startPlatform = new Platform(width/2 - platformWidth/2, startY, platformWidth);
-    platforms.push(startPlatform);
+    let explanation = (currentQuestion && currentQuestion.explanation) ? currentQuestion.explanation : 'Review the concept and try again.';
+    showExplanationPopup(explanation, () => {
+      showMessage('❌ Incorrect — restarting level...');
+      // Reset platforms and player to the level's start platform
+      platforms = [];
+      let platformWidth = getPlatformWidth(level);
+      let startPlatform = new Platform(width/2 - platformWidth/2, startY, platformWidth);
+      platforms.push(startPlatform);
 
-    // Reinitialize player on the start platform
-    player.x = startPlatform.x + startPlatform.w / 2;
-    player.y = startPlatform.y - player.size / 2;
-    player.vx = 0;
-    player.vy = 0;
-    player.isJumping = false;
-    // reset camera and max height tracking
-    cameraY = 0;
-    maxHeightReached = player.y;
+      // Reinitialize player on the start platform
+      player.x = startPlatform.x + startPlatform.w / 2;
+      player.y = startPlatform.y - player.size / 2;
+      player.vx = 0;
+      player.vy = 0;
+      player.isJumping = false;
+      // reset camera and max height tracking
+      cameraY = 0;
+      maxHeightReached = player.y;
 
-    // regenerate platforms/enemies/facts for this level
-    generateLevelPlatforms();
-    // switch back to practice play
-    gameState = 'practice';
-    messageTimer = 90;
+      // regenerate platforms/enemies/facts for this level
+      generateLevelPlatforms();
+      // switch back to practice play
+      gameState = 'practice';
+      messageTimer = 90;
+    });
   }
 }
 
@@ -1958,7 +2420,10 @@ function checkAnswer(selected) {
     messageTimer = 60;
   } else {
     if (sfx.wrong) { try { sfx.wrong.currentTime = 0; sfx.wrong.play(); } catch(e){} }
-    gameState = 'gameover';
+    let explanation = (currentQuestion && currentQuestion.explanation) ? currentQuestion.explanation : 'Review the fact and try again.';
+    showExplanationPopup(explanation, () => {
+      gameState = 'gameover';
+    });
   }
 }
 
